@@ -22,11 +22,19 @@ addEventListeners () {
   document.addEventListener('touchstart', this.onStart);
   document.addEventListener('touchmove', this.onMove);
   document.addEventListener('touchend', this.onEnd)
+
+  document.addEventListener('mousedown', this.onStart);
+  document.addEventListener('mousemove', this.onMove);
+  document.addEventListener('mouseup', this.onEnd)
 }
 
 onStart (evt) {
+
+  if (this.target)
+  return;
+
   if (!evt.target.classList.contains('card'))
-  return
+  return;
   this.target = evt.target
   this.targetBCR = this.target.getBoundingClientRect()
   this.startX = evt.pageX || evt.touches[0].pageX
@@ -55,8 +63,9 @@ onEnd(evt) {
 }
 
 update () {
+  requestAnimationFrame(this.update)
   if(!this.target)
-  return
+  return;
   if (this.draggingCard) {
     this.screenX = this.currentX - this.startX
   } else {
@@ -64,10 +73,41 @@ update () {
   }
   const normalizedDragDistance = (Math.abs(this.screenX) / this.targetBCR.width)
  const opacity = 1 - Math.pow(normalizedDragDistance, 3)
-  this.target.style.transform = `translateX(${screenX}px)`
+  this.target.style.transform = `translateX(${this.screenX}px)`
   this.target.style.opacity = opacity
+  const isNearlyAtStart = (Math.abs(this.screenX) < 0.01)
+  const isNearlyInvisible = (opacity < 0.01)
+
+  if (!this.draggingCard) {
+    if (isNearlyInvisible) {
+      let isAfterCurrentTarget = false
+      Array.from(this.cards).forEach(card => {
+        if (card === this.target) {
+          isAfterCurrentTarget = true
+          return
+        }
+        if (!isAfterCurrentTarget)
+        return
+
+        const onTransitionEnd = _ => {
+          this.target = null
+          card.removeEventListener('transitionend', onTransitionEnd)
+        }
+
+        card.style.transform = `translateY(${this.targetBCR.height + 20}px`
+          card.style.transition = 'transform 3s cubic-bezier(0,0,0.31,1)'
+          card.addEventListener('transitionend', onTransitionEnd)
+      })
+      this.target.parentNode.removeChild(this.target)
+      this.target = null
+    }
+  }
+  if (isNearlyAtStart) {
+    this.target.style.willChange = 'initial'
+    this.target.style.transform = 'none'
+    this.target = null
+  }
 }
-requestAnimationFrame(this.update)
 }
 
 window.addEventListener('load', () => new Cards())
